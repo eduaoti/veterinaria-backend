@@ -17,15 +17,16 @@ router.post('/agendar', async (req, res) => {
     return res.status(400).json({ message: 'Datos de cita incompletos.' });
   }
 
-  // ✅ Combina fecha y hora en horario local (no UTC)
+  // ✅ Combina fecha y hora como local (sin UTC)
   const [year, month, day] = fecha.split('-').map(Number);
   const [hour, minute] = hora.split(':').map(Number);
-  const fechaHoraCita = new Date(year, month - 1, day, hour, minute);
+  const fechaHoraCita = new Date(year, month - 1, day, hour, minute); // mes - 1 porque enero = 0
 
   if (isNaN(fechaHoraCita.getTime())) {
     return res.status(400).json({ message: 'Fecha y hora no válidas' });
   }
 
+  // Opcional: buscar `idMascota` si se proporciona el nombre de la mascota
   let idMascota = null;
   if (mascotaNombre) {
     const mascota = await Mascota.findOne({ nombreMascota: mascotaNombre });
