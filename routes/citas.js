@@ -1,24 +1,26 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const moment = require('moment-timezone'); // 🕐 CORRECTO: usamos moment-timezone
 const Cita = require('../models/Cita');
 const User = require('../models/User');
 const PlanCuidado = require('../models/PlanCuidado');
 const Mascota = require('../models/Mascotas');
-const moment = require('moment-timezone');
 const router = express.Router();
 const emailService = require('../services/emailService');
 
+// Función para verificar si un ObjectId es válido
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+// ✅ AGENDAR CITA
 router.post('/agendar', async (req, res) => {
-  const { cliente, fecha, hora, comentario, correo, mascotaNombre } = req.body;
+  const { cliente, fecha, hora, comentario, correo, mascotaNombre, servicios = [] } = req.body;
 
   if (!cliente || !fecha || !hora || !correo) {
     return res.status(400).json({ message: 'Datos de cita incompletos.' });
   }
 
+  // CORRECTO: Generamos fecha con zona horaria local
   const fechaHoraCita = moment.tz(`${fecha} ${hora}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').toDate();
-
   if (isNaN(fechaHoraCita.getTime())) {
     return res.status(400).json({ message: 'Fecha y hora no válidas' });
   }
@@ -30,14 +32,14 @@ router.post('/agendar', async (req, res) => {
   }
 
   const nuevaCita = new Cita({
-    servicios: req.body.servicios || [],
     cliente,
     fechaHora: fechaHoraCita,
     comentario,
     correo,
     mascota: mascotaNombre,
     idMascota,
-    estado: 'en espera de atención'
+    estado: 'en espera de atención',
+    servicios
   });
 
   try {
@@ -57,6 +59,7 @@ router.post('/agendar', async (req, res) => {
   }
 });
 
+// ✅ EDITAR CITA
 router.put('/editar/:id', async (req, res) => {
   const { id } = req.params;
   const { cliente, fecha, hora, comentario, correo, servicios = [] } = req.body;
@@ -67,11 +70,10 @@ router.put('/editar/:id', async (req, res) => {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(correo)) {
-    return res.status(400).json({ message: 'El formato del correo electrónico no es válido.' });
+    return res.status(400).json({ message: 'Formato de correo inválido.' });
   }
 
   const fechaCompleta = moment.tz(`${fecha} ${hora}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').toDate();
-
   if (isNaN(fechaCompleta.getTime()) || fechaCompleta < new Date()) {
     return res.status(400).json({ message: 'Fecha y hora no válidas o en el pasado' });
   }
@@ -101,7 +103,7 @@ router.put('/editar/:id', async (req, res) => {
       },
       citaNueva: {
         fechaHora: citaActualizada.fechaHora.toISOString(),
-        comentario: comentario,
+        comentario,
       },
     });
 
@@ -112,6 +114,7 @@ router.put('/editar/:id', async (req, res) => {
   }
 });
 
+// ✅ AGREGAR VISITA
 router.post('/visitas/agregar', async (req, res) => {
   const { idMascota, fecha, hora, descripcion, nombreDueno, correo } = req.body;
 
@@ -120,7 +123,6 @@ router.post('/visitas/agregar', async (req, res) => {
   }
 
   const fechaHora = moment.tz(`${fecha} ${hora}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').toDate();
-
   if (isNaN(fechaHora.getTime())) {
     return res.status(400).json({ message: 'Fecha y hora no válidas' });
   }
@@ -128,7 +130,7 @@ router.post('/visitas/agregar', async (req, res) => {
   try {
     const citaExistente = await Cita.findOne({ fechaHora, idMascota });
     if (citaExistente) {
-      return res.status(400).json({ message: 'Ya existe una cita en la misma fecha y hora.' });
+      return res.status(400).json({ message: 'Ya existe una cita en esa fecha y hora.' });
     }
 
     const nuevaCita = new Cita({
