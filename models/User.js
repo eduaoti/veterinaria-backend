@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const validator = require('validator');
 
 const UserSchema = new mongoose.Schema({
@@ -17,14 +17,7 @@ const UserSchema = new mongoose.Schema({
     fotoPerfil: { type: String } // Nuevo campo para la foto de perfil
 }, { timestamps: true });
 
-
 // Middleware para encriptar la contraseña antes de guardar el usuario
-UserSchema.methods.comparePassword = async function(password) {
-    return await bcrypt.compare(password, this.password);
-};
-
-
-// Método para comparar contraseñas
 UserSchema.methods.comparePassword = async function(password) {
     return await bcrypt.compare(password, this.password);
 };
