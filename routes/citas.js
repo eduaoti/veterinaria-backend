@@ -54,57 +54,62 @@ router.post('/agendar', async (req, res) => {
     res.status(500).json({ message: 'Error al agendar la cita', error: error.message });
   }
 });
+router.put('/editar/:id', async (req, res) => {
+  const { id } = req.params;
+  const { cliente, fecha, hora, comentario, correo, servicios = [] } = req.body;
 
-router.post('/agendar', async (req, res) => {
-    const { cliente, fecha, hora, comentario, correo, mascotaNombre } = req.body;
+  console.log('Datos recibidos para edición:', req.body);
 
-    if (!cliente || !fecha || !hora || !correo) {
-        return res.status(400).json({ message: 'Datos de cita incompletos.' });
-    }
+  if (!cliente) return res.status(400).json({ message: 'El nombre del cliente es requerido.' });
+  if (!fecha) return res.status(400).json({ message: 'La fecha es requerida.' });
+  if (!hora) return res.status(400).json({ message: 'La hora es requerida.' });
+  if (!correo) return res.status(400).json({ message: 'El correo electrónico es requerido.' });
 
-    // Combina fecha y hora
-    const fechaHoraCita = new Date(`${fecha}T${hora}:00`);
-    if (isNaN(fechaHoraCita.getTime())) return res.status(400).json({ message: 'Fecha y hora no válidas' });
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(correo)) return res.status(400).json({ message: 'El formato del correo electrónico no es válido.' });
 
-    // Ajuste de la fecha y hora con la zona horaria UTC
-    const fechaEnUTC = new Date(fechaHoraCita.toLocaleString('en-US', { timeZone: 'UTC' }));
+  // Convierte la fecha y hora a la zona horaria de México
+  const fechaHoraCita = moment.tz(`${fecha} ${hora}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').toDate();
 
-    // Opcional: buscar `idMascota` si se proporciona el nombre de la mascota
-    let idMascota = null;
-    if (mascotaNombre) {
-        const mascota = await Mascota.findOne({ nombreMascota: mascotaNombre });
-        if (mascota) idMascota = mascota._id;
-    }
+  if (isNaN(fechaHoraCita.getTime()) || fechaHoraCita < new Date()) {
+    return res.status(400).json({ message: 'Fecha y hora no válidas o en el pasado' });
+  }
 
-    const nuevaCita = new Cita({
-        servicios: req.body.servicios || [], // 👈 Nuevo campo para los servicios del carrito
+  try {
+    const citaAnterior = await Cita.findById(id);
+    if (!citaAnterior) return res.status(404).json({ message: 'Cita no encontrada' });
+
+    const citaActualizada = await Cita.findByIdAndUpdate(
+      id,
+      {
         cliente,
-        fechaHora: fechaEnUTC, // Guardar la fecha y hora en UTC
+        fechaHora: fechaHoraCita, // Se actualiza con la nueva fecha y hora convertida
         comentario,
         correo,
-        mascota: mascotaNombre,
-        idMascota,
-        estado: 'en espera de atención'
+        servicios, // Se actualizan los servicios
+        estado: citaAnterior.estado
+      },
+      { new: true }
+    );
+
+    // Enviar el correo de confirmación de la edición
+    await emailService.sendEditEmail(correo, {
+      cliente,
+      citaAnterior: {
+        fechaHora: citaAnterior.fechaHora.toISOString(),
+        comentario: citaAnterior.comentario,
+      },
+      citaNueva: {
+        fechaHora: citaActualizada.fechaHora.toISOString(),
+        comentario: comentario,
+      },
     });
 
-    try {
-        // Guardar la cita en la base de datos
-        await nuevaCita.save();
-
-        // Intentar enviar el correo de confirmación
-        try {
-            await emailService.sendConfirmationEmail(correo, nuevaCita);
-            console.log('Correo de confirmación enviado.');
-        } catch (emailError) {
-            console.error('Error al enviar el correo de confirmación:', emailError);
-        }
-
-        // Responder con éxito al cliente
-        res.status(201).json(nuevaCita);
-    } catch (error) {
-        console.error('Error al agendar la cita:', error);
-        res.status(500).json({ message: 'Error al agendar la cita', error: error.message });
-    }
+    return res.status(200).json(citaActualizada);
+  } catch (error) {
+    console.error('Error al editar la cita:', error);
+    return res.status(500).json({ message: 'Error al editar la cita', error: error.message });
+  }
 });
 
 router.get('/atendidas', async (req, res) => {
