@@ -9,7 +9,6 @@ const authRoutes = require('./routes/auth'); // Rutas de autenticación
 const mascotasRoutes = require('./routes/mascotas'); // Rutas de mascotas
 const citasRoutes = require('./routes/citas'); // Importa las rutas de citas
 const planesRoutes = require('./routes/planes'); // Rutas de planes de cuidado
-const { number } = require('joi');
 
 // Cargar variables de entorno desde el archivo .env
 dotenv.config(); 
@@ -30,8 +29,6 @@ app.use('/api/mascotas', mascotasRoutes); // Rutas de mascotas
 app.use('/api/citas', citasRoutes); // Ruta para las citas
 app.use('/api/planes', planesRoutes); // Ruta para planes de cuidado
 
-
-
 // Conexión a la base de datos MongoDB
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -39,7 +36,7 @@ mongoose.connect(process.env.MONGO_URI, {
 })
 .then(() => console.log('Conectado a MongoDB'))
 .catch(error => console.error('Error al conectar a MongoDB:', error));
-number
+
 // Configuración del puerto
 const PORT = process.env.PORT || 3000;
 
