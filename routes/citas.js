@@ -11,54 +11,54 @@ const emailService = require('../services/emailService'); // Importa tu servicio
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 router.post('/agendar', async (req, res) => {
-    const { cliente, fecha, hora, comentario, correo, mascotaNombre } = req.body;
+  const { cliente, fecha, hora, comentario, correo, mascotaNombre } = req.body;
 
-    if (!cliente || !fecha || !hora || !correo) {
-        return res.status(400).json({ message: 'Datos de cita incompletos.' });
-    }
+  if (!cliente || !fecha || !hora || !correo) {
+    return res.status(400).json({ message: 'Datos de cita incompletos.' });
+  }
 
-    // Combina fecha y hora
-    const fechaHoraCita = new Date(`${fecha}T${hora}:00`);
-    if (isNaN(fechaHoraCita.getTime())) return res.status(400).json({ message: 'Fecha y hora no válidas' });
+  // ✅ Combina fecha y hora en horario local (no UTC)
+  const [year, month, day] = fecha.split('-').map(Number);
+  const [hour, minute] = hora.split(':').map(Number);
+  const fechaHoraCita = new Date(year, month - 1, day, hour, minute);
 
-    // Opcional: buscar `idMascota` si se proporciona el nombre de la mascota
-    let idMascota = null;
-    if (mascotaNombre) {
-        const mascota = await Mascota.findOne({ nombreMascota: mascotaNombre });
-        if (mascota) idMascota = mascota._id;
-    }
+  if (isNaN(fechaHoraCita.getTime())) {
+    return res.status(400).json({ message: 'Fecha y hora no válidas' });
+  }
 
-    const nuevaCita = new Cita({
-        servicios: req.body.servicios || [], // 👈 Nuevo campo para los servicios del carrito
-        cliente,
-        fechaHora: fechaHoraCita,
-        comentario,
-        correo,
-        mascota: mascotaNombre,
-        idMascota,
-        estado: 'en espera de atención'
-    });
+  let idMascota = null;
+  if (mascotaNombre) {
+    const mascota = await Mascota.findOne({ nombreMascota: mascotaNombre });
+    if (mascota) idMascota = mascota._id;
+  }
+
+  const nuevaCita = new Cita({
+    servicios: req.body.servicios || [],
+    cliente,
+    fechaHora: fechaHoraCita,
+    comentario,
+    correo,
+    mascota: mascotaNombre,
+    idMascota,
+    estado: 'en espera de atención'
+  });
+
+  try {
+    await nuevaCita.save();
 
     try {
-        // Guardar la cita en la base de datos
-        await nuevaCita.save();
-
-        // Intentar enviar el correo de confirmación
-        try {
-            await emailService.sendConfirmationEmail(correo, nuevaCita);
-            console.log('Correo de confirmación enviado.');
-        } catch (emailError) {
-            console.error('Error al enviar el correo de confirmación:', emailError);
-        }
-
-        // Responder con éxito al cliente
-        res.status(201).json(nuevaCita);
-    } catch (error) {
-        console.error('Error al agendar la cita:', error);
-        res.status(500).json({ message: 'Error al agendar la cita', error: error.message });
+      await emailService.sendConfirmationEmail(correo, nuevaCita);
+      console.log('Correo de confirmación enviado.');
+    } catch (emailError) {
+      console.error('Error al enviar el correo de confirmación:', emailError);
     }
-});
 
+    res.status(201).json(nuevaCita);
+  } catch (error) {
+    console.error('Error al agendar la cita:', error);
+    res.status(500).json({ message: 'Error al agendar la cita', error: error.message });
+  }
+});
 
 // Ruta para obtener citas atendidas
 router.get('/atendidas', async (req, res) => {
