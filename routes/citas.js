@@ -55,61 +55,77 @@ router.post('/agendar', async (req, res) => {
   }
 });
 router.put('/editar/:id', async (req, res) => {
-  const { id } = req.params;
-  const { cliente, fecha, hora, comentario, correo, servicios = [] } = req.body;
+    const { id } = req.params;
+    const { cliente, fecha, hora, comentario, correo, servicios = [] } = req.body;
 
-  console.log('Datos recibidos para edición:', req.body);
+    console.log('Datos recibidos para edición:', req.body);
 
-  if (!cliente) return res.status(400).json({ message: 'El nombre del cliente es requerido.' });
-  if (!fecha) return res.status(400).json({ message: 'La fecha es requerida.' });
-  if (!hora) return res.status(400).json({ message: 'La hora es requerida.' });
-  if (!correo) return res.status(400).json({ message: 'El correo electrónico es requerido.' });
+    // Validaciones básicas de los campos
+    if (!cliente) return res.status(400).json({ message: 'El nombre del cliente es requerido.' });
+    if (!fecha) return res.status(400).json({ message: 'La fecha es requerida.' });
+    if (!hora) return res.status(400).json({ message: 'La hora es requerida.' });
+    if (!correo) return res.status(400).json({ message: 'El correo electrónico es requerido.' });
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(correo)) return res.status(400).json({ message: 'El formato del correo electrónico no es válido.' });
+    // Validación de formato de correo electrónico
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(correo)) return res.status(400).json({ message: 'El formato del correo electrónico no es válido.' });
 
-  // Convierte la fecha y hora a la zona horaria de México
-  const fechaHoraCita = moment.tz(`${fecha} ${hora}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').toDate();
+    // Ajuste de la fecha y hora con la zona horaria de México
+    const fechaHora = moment.tz(`${fecha} ${hora}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+    const fechaCompleta = fechaHora.toDate();
 
-  if (isNaN(fechaHoraCita.getTime()) || fechaHoraCita < new Date()) {
-    return res.status(400).json({ message: 'Fecha y hora no válidas o en el pasado' });
-  }
+    if (isNaN(fechaCompleta.getTime()) || fechaHora.isBefore(moment())) {
+        return res.status(400).json({ message: 'Fecha y hora no válidas o en el pasado' });
+    }
 
-  try {
-    const citaAnterior = await Cita.findById(id);
-    if (!citaAnterior) return res.status(404).json({ message: 'Cita no encontrada' });
+    // Convertir a UTC para guardarlo en la base de datos
+    const fechaEnUTC = moment(fechaCompleta).utc().toDate();
 
-    const citaActualizada = await Cita.findByIdAndUpdate(
-      id,
-      {
-        cliente,
-        fechaHora: fechaHoraCita, // Se actualiza con la nueva fecha y hora convertida
-        comentario,
-        correo,
-        servicios, // Se actualizan los servicios
-        estado: citaAnterior.estado
-      },
-      { new: true }
-    );
+    try {
+        // Verificar si la cita existe en la base de datos
+        const citaAnterior = await Cita.findById(id);
+        if (!citaAnterior) {
+            return res.status(404).json({ message: `Cita con ID ${id} no encontrada` });
+        }
 
-    // Enviar el correo de confirmación de la edición
-    await emailService.sendEditEmail(correo, {
-      cliente,
-      citaAnterior: {
-        fechaHora: citaAnterior.fechaHora.toISOString(),
-        comentario: citaAnterior.comentario,
-      },
-      citaNueva: {
-        fechaHora: citaActualizada.fechaHora.toISOString(),
-        comentario: comentario,
-      },
-    });
+        // Actualizar la cita con los nuevos datos
+        const citaActualizada = await Cita.findByIdAndUpdate(
+            id,
+            {
+                cliente,
+                fechaHora: fechaEnUTC, // Guardar la fecha y hora en UTC
+                comentario,
+                correo,
+                servicios, // Servicios agregados
+                estado: citaAnterior.estado, // Mantener el estado anterior
+            },
+            { new: true }
+        );
 
-    return res.status(200).json(citaActualizada);
-  } catch (error) {
-    console.error('Error al editar la cita:', error);
-    return res.status(500).json({ message: 'Error al editar la cita', error: error.message });
-  }
+        // Enviar correo de confirmación de edición
+        try {
+            await emailService.sendEditEmail(correo, {
+                cliente,
+                citaAnterior: {
+                    fechaHora: citaAnterior.fechaHora.toISOString(),
+                    comentario: citaAnterior.comentario,
+                },
+                citaNueva: {
+                    fechaHora: citaActualizada.fechaHora.toISOString(),
+                    comentario: comentario,
+                },
+            });
+            console.log('Correo de confirmación de edición enviado.');
+        } catch (emailError) {
+            console.error('Error al enviar el correo de confirmación:', emailError);
+        }
+
+        // Responder con la cita actualizada
+        return res.status(200).json(citaActualizada);
+    } catch (error) {
+        console.error('Error al editar la cita:', error);
+        return res.status(500).json({ message: 'Error al editar la cita', error: error.message });
+    }
 });
 
 router.get('/atendidas', async (req, res) => {
