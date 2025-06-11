@@ -18,3 +18,6 @@ jobs:
       # Runs a single command using the runners shell
       - name: Echo terminal
         run: echo Hello, world!
+        
+      - name: Di la fecha Hoy
+        run: date
