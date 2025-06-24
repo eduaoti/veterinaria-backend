@@ -15,6 +15,8 @@ const UserSchema = new mongoose.Schema({
     recoveryCode: { type: String },  // Código de recuperación
     recoveryCodeExpiration: { type: Date }, // Expiración del código de recuperación
     fotoPerfil: { type: String }, // Nuevo campo para la foto de perfil
+    lastLogin: { type: Date }, // Agregado aquí
+
 
     // 🔽 Campos nuevos para cambio de correo:
     emailChangeCode: { type: String },

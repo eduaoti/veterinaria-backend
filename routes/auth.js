@@ -147,7 +147,6 @@ router.post('/login', async (req, res) => {
             return res.status(404).json({ message: 'Usuario no encontrado.' });
         }
 
-        // Verifica si el usuario está verificado
         if (!user.isVerified) {
             return res.status(403).json({ message: 'La cuenta no está verificada. Verifica tu correo electrónico primero.' });
         }
@@ -157,16 +156,20 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: 'Contraseña incorrecta.' });
         }
 
+        // ACTUALIZA FECHA DE ÚLTIMO LOGIN
+        user.lastLogin = new Date();
+        await user.save();
+
         const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, {
-            expiresIn: '2m' // 2 minutos
+            expiresIn: '2m'
         });
-        
+
         res.status(200).json({ token, role: user.role, message: 'Inicio de sesión exitoso.', success: true });
     } catch (error) {
-        console.error('Error en el inicio de sesión:', error);
         res.status(500).json({ message: 'Error al iniciar sesión.' });
     }
 });
+
 
 
 // Ruta para obtener información del usuario autenticado

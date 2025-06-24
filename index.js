@@ -3,6 +3,9 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors'); // Importa CORS
 const path = require('path'); // Importa path
+const cron = require('node-cron');
+const User = require('./models/User'); // Ajusta la ruta si tu modelo está en otra carpeta
+
 
 // Importa las rutas
 const authRoutes = require('./routes/auth'); // Rutas de autenticación
@@ -43,4 +46,22 @@ const PORT = process.env.PORT || 3000;
 // Iniciar el servidor
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
+});
+
+// Cronjob: borra usuarios que no han iniciado sesión en 1 mes
+cron.schedule('0 2 * * *', async () => {
+    const haceUnMes = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    try {
+        const resultado = await User.deleteMany({
+            $or: [
+                { lastLogin: { $lt: haceUnMes } },
+                { lastLogin: { $exists: false }, createdAt: { $lt: haceUnMes } }
+            ]
+        });
+        if (resultado.deletedCount > 0) {
+            console.log(`🗑️ Usuarios eliminados por inactividad: ${resultado.deletedCount}`);
+        }
+    } catch (err) {
+        console.error('Error eliminando usuarios inactivos:', err);
+    }
 });
