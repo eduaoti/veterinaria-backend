@@ -305,6 +305,128 @@ router.post('/renew-token', async (req, res) => {
         res.status(401).json({ message: 'No se pudo renovar el token.' });
     }
 });
+// PUT /update-profile
+router.put('/update-profile', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token.' });
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { nombre, apellidoPaterno, apellidoMaterno, telefono } = req.body;
+
+        // Busca usuario
+        const user = await User.findById(decoded.userId);
+        if (!user) return res.status(404).json({ message: 'Usuario no encontrado.' });
+
+        // Actualiza campos
+        if (nombre) user.nombre = nombre;
+        if (apellidoPaterno) user.apellidoPaterno = apellidoPaterno;
+        if (apellidoMaterno) user.apellidoMaterno = apellidoMaterno;
+        if (telefono) user.telefono = telefono;
+
+        await user.save();
+
+        res.status(200).json({ message: 'Perfil actualizado.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error actualizando perfil.', error: err.message });
+    }
+});
+router.post('/request-email-change', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token.' });
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { newEmail } = req.body;
+
+        if (!validator.isEmail(newEmail)) {
+            return res.status(400).json({ message: 'Correo nuevo no válido.' });
+        }
+
+        // Checa si el nuevo correo ya existe
+        const existing = await User.findOne({ email: newEmail });
+        if (existing) {
+            return res.status(409).json({ message: 'Este correo ya está registrado.' });
+        }
+
+        // Busca usuario y genera código
+        const user = await User.findById(decoded.userId);
+        if (!user) return res.status(404).json({ message: 'Usuario no encontrado.' });
+
+        const code = crypto.randomBytes(3).toString('hex');
+        user.emailChangeCode = code;
+        user.pendingNewEmail = newEmail;
+        user.emailChangeCodeExpires = Date.now() + 15 * 60 * 1000; // 15 minutos
+
+        await user.save();
+
+        // Manda el código al correo actual del usuario
+        await sendVerificationCodeEmail(user.email, user.nombre, user.apellidoPaterno, user.apellidoMaterno, code);
+
+        res.status(200).json({ message: 'Código enviado al correo actual.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error solicitando cambio de correo.', error: err.message });
+    }
+});
+router.post('/confirm-email-change', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token.' });
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { code } = req.body;
+
+        const user = await User.findById(decoded.userId);
+        if (!user) return res.status(404).json({ message: 'Usuario no encontrado.' });
+
+        if (
+            !user.emailChangeCode ||
+            user.emailChangeCode !== code ||
+            Date.now() > user.emailChangeCodeExpires
+        ) {
+            return res.status(400).json({ message: 'Código inválido o expirado.' });
+        }
+
+        // Cambia el correo
+        user.email = user.pendingNewEmail;
+        user.pendingNewEmail = null;
+        user.emailChangeCode = null;
+        user.emailChangeCodeExpires = null;
+
+        await user.save();
+
+        res.status(200).json({ message: 'Correo actualizado correctamente.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error al confirmar código.', error: err.message });
+    }
+});
+router.post('/change-password', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token.' });
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { currentPassword, newPassword } = req.body;
+
+        const user = await User.findById(decoded.userId);
+        if (!user) return res.status(404).json({ message: 'Usuario no encontrado.' });
+
+        const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+        if (!isPasswordValid) {
+            return res.status(400).json({ message: 'Contraseña actual incorrecta.' });
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+
+        await sendPasswordUpdatedEmail(user.email, user.nombre, user.apellidoPaterno);
+
+        res.status(200).json({ message: 'Contraseña actualizada correctamente.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Error al cambiar contraseña.', error: err.message });
+    }
+});
+
 
 // Exportar el router
 module.exports = router;

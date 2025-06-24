@@ -14,7 +14,12 @@ const UserSchema = new mongoose.Schema({
     isVerified: { type: Boolean, default: false },
     recoveryCode: { type: String },  // Código de recuperación
     recoveryCodeExpiration: { type: Date }, // Expiración del código de recuperación
-    fotoPerfil: { type: String } // Nuevo campo para la foto de perfil
+    fotoPerfil: { type: String }, // Nuevo campo para la foto de perfil
+
+    // 🔽 Campos nuevos para cambio de correo:
+    emailChangeCode: { type: String },
+    emailChangeCodeExpires: { type: Date },
+    pendingNewEmail: { type: String }
 }, { timestamps: true });
 
 // Middleware para encriptar la contraseña antes de guardar el usuario
