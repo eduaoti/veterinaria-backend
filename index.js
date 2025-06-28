@@ -47,21 +47,34 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
-
-// Cronjob: borra usuarios que no han iniciado sesión en 1 mes
-cron.schedule('0 2 * * *', async () => {
-    const haceUnMes = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+// Cronjob: borra usuarios que no se han logueado en 5 minutos
+cron.schedule('* * * * *', async () => {
+    // 5 minutos en milisegundos
+    const haceCincoMin = new Date(Date.now() - 5 * 60 * 1000);
+  
     try {
-        const resultado = await User.deleteMany({
-            $or: [
-                { lastLogin: { $lt: haceUnMes } },
-                { lastLogin: { $exists: false }, createdAt: { $lt: haceUnMes } }
-            ]
-        });
-        if (resultado.deletedCount > 0) {
-            console.log(`🗑️ Usuarios eliminados por inactividad: ${resultado.deletedCount}`);
-        }
+      // 1) Busca usuarios inactivos
+      const usuariosInactivos = await User.find({
+        lastLogin: { $lt: haceCincoMin }
+      }).select('email');
+  
+      if (usuariosInactivos.length === 0) {
+        console.log('🔍 No hay usuarios inactivos (>5 min) para eliminar.');
+        return;
+      }
+  
+      // 2) Extrae y muestra los correos
+      const emails = usuariosInactivos.map(u => u.email);
+      console.log('📧 Correos a eliminar por inactividad (>5 min):', emails);
+  
+      // 3) Elimina esos usuarios
+      const resultado = await User.deleteMany({
+        _id: { $in: usuariosInactivos.map(u => u._id) }
+      });
+  
+      console.log(`🗑️ Eliminados ${resultado.deletedCount} usuarios inactivos.`);
     } catch (err) {
-        console.error('Error eliminando usuarios inactivos:', err);
+      console.error('Error al eliminar usuarios inactivos:', err);
     }
-});
+  });
+  
