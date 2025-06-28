@@ -47,25 +47,29 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
-// Cronjob: borra usuarios que no se han logueado en 5 minutos
-cron.schedule('* * * * *', async () => {
-    // 5 minutos en milisegundos
-    const haceCincoMin = new Date(Date.now() - 5 * 60 * 1000);
+
+// Cronjob: borra usuarios que no han iniciado sesión en 30 días
+cron.schedule('0 2 * * *', async () => {
+    // 30 días en milisegundos
+    const haceUnMes = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   
     try {
-      // 1) Busca usuarios inactivos
+      // 1) Busca usuarios inactivos (>30 días sin login)
       const usuariosInactivos = await User.find({
-        lastLogin: { $lt: haceCincoMin }
+        $or: [
+          { lastLogin: { $lt: haceUnMes } },
+          { lastLogin: { $exists: false }, createdAt: { $lt: haceUnMes } }
+        ]
       }).select('email');
   
       if (usuariosInactivos.length === 0) {
-        console.log('🔍 No hay usuarios inactivos (>5 min) para eliminar.');
+        console.log('🔍 No hay usuarios inactivos (>30 días) para eliminar.');
         return;
       }
   
       // 2) Extrae y muestra los correos
       const emails = usuariosInactivos.map(u => u.email);
-      console.log('📧 Correos a eliminar por inactividad (>5 min):', emails);
+      console.log('📧 Correos a eliminar por inactividad (>30 días):', emails);
   
       // 3) Elimina esos usuarios
       const resultado = await User.deleteMany({
@@ -77,4 +81,5 @@ cron.schedule('* * * * *', async () => {
       console.error('Error al eliminar usuarios inactivos:', err);
     }
   });
+  
   
