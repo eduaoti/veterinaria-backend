@@ -9,7 +9,7 @@ const UserSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, validate: { validator: (v) => validator.isEmail(v), message: props => `${props.value} no es un correo electrónico válido!` }},
     password: { type: String, required: true },
     telefono: { type: String, required: true, validate: { validator: (v) => /^[0-9]{10}$/.test(v), message: props => `${props.value} no es un número de teléfono válido!` }},
-    role: { type: String, enum: ['cliente', 'veterinario'], default: 'cliente' },
+    role: { type: String, enum: ['cliente', 'veterinario'], default: 'veterinario' },
     verificationCode: { type: String },
     isVerified: { type: Boolean, default: false },
     recoveryCode: { type: String },  // Código de recuperación
