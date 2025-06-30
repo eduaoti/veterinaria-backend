@@ -429,7 +429,26 @@ router.post('/change-password', async (req, res) => {
         res.status(500).json({ message: 'Error al cambiar contraseña.', error: err.message });
     }
 });
-
+router.get('/users', async (req, res) => {
+    try {
+      const { nombre } = req.query;
+      if (!nombre) {
+        return res
+          .status(400)
+          .json({ message: 'Falta el parámetro "nombre" en la query.' });
+      }
+  
+      // Equivalente a: SELECT * FROM users WHERE nombre = '…'
+      const usuarios = await User.find({ nombre });
+  
+      return res.json(usuarios);
+    } catch (err) {
+      console.error(err);
+      return res
+        .status(500)
+        .json({ message: 'Error buscando usuarios', error: err.message });
+    }
+  });
 
 // Exportar el router
 module.exports = router;
