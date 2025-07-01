@@ -106,6 +106,7 @@ router.post('/register', upload.single('fotoPerfil'), async (req, res) => {
       // -------------------------------
       // Hashear contraseña
       const hashedPassword = await bcrypt.hash(password, 10);
+      
       // Generar código de verificación
       const newVerificationCode = crypto.randomBytes(3).toString('hex');
   
