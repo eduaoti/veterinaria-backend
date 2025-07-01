@@ -59,94 +59,25 @@ router.post('/update-profile-photo', upload.single('fotoPerfil'), async (req, re
 
 // Ruta para registrar un nuevo usuario
 router.post('/register', upload.single('fotoPerfil'), async (req, res) => {
-  // ┌────────────────────────────────────────────────────────────────────────┐
-  // │ Extraemos los campos del body                                     │
-  // └────────────────────────────────────────────────────────────────────────┘
-  const {
-    nombre,
-    apellidoPaterno,
-    apellidoMaterno,
-    email,
-    password,
-    telefono,
-    role
-  } = req.body;
+    const { nombre, apellidoPaterno, apellidoMaterno, email, password, telefono, role } = req.body;
 
-  // ┌────────────────────────────────────────────────────────────────────────┐
-  // │ 2️⃣ Validación de campos obligatorios                                │
-  // │    (equivale a comprobar que req.body.email no sea undefined/null)  │
-  // └────────────────────────────────────────────────────────────────────────┘
-  if (
-    !nombre ||
-    !apellidoPaterno ||
-    !apellidoMaterno ||
-    !email ||
-    !telefono ||
-    !role ||
-    !password
-  ) {
-    return res
-      .status(400)
-      .json({ message: 'Todos los campos son obligatorios.' });
-  }
+    // Validación de campos requeridos
+    if (!nombre || !apellidoPaterno || !apellidoMaterno || !email || !telefono || !role || !password) {
+        return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
+    }
 
-  // ┌────────────────────────────────────────────────────────────────────────┐
-  // │ 3️⃣ Validación de formato de email                                    │
-  // │    (usa validator.isEmail en lugar de regex manual)                  │
-  // └────────────────────────────────────────────────────────────────────────┘
-  if (!validator.isEmail(email)) {
-    return res.status(400).json({ message: 'El correo electrónico no es válido.' });
-  }
+    if (!validator.isEmail(email)) {
+        return res.status(400).json({ message: 'El correo electrónico no es válido.' });
+    }
 
-  // ┌────────────────────────────────────────────────────────────────────────┐
-  // │ 4️⃣ Comprobación de existencia previo                                 │
-  // │    (impide duplicados, similar a UNIQUE constraint en BD relacional) │
-  // └────────────────────────────────────────────────────────────────────────┘
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return res
-      .status(409)
-      .json({ message: 'El correo electrónico ya está registrado.' });
-  }
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+        return res.status(409).json({ message: 'El correo electrónico ya está registrado.' });
+    }
 
-  try {
-    // ┌────────────────────────────────────────────────────────────────────────┐
-    // │ 5️⃣ Hasheo de contraseña y resto de lógica de guardado                 │
-    // └────────────────────────────────────────────────────────────────────────┘
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newVerificationCode = crypto.randomBytes(3).toString('hex');
-
-    const newUser = new User({
-      nombre,
-      apellidoPaterno,
-      apellidoMaterno,
-      email,
-      password: hashedPassword,
-      telefono,
-      role,
-      verificationCode: newVerificationCode,
-      isVerified: false,
-      fotoPerfil: req.file ? req.file.path : null
-    });
-    await newUser.save();
-
-    await sendVerificationCodeEmail(
-      email,
-      nombre,
-      apellidoPaterno,
-      apellidoMaterno,
-      newVerificationCode
-    );
-return res
-      .status(201)
-      .json({ message: 'Usuario registrado exitosamente. Verifique su correo electrónico.', success: true });
-  } catch (error) {
-    console.error(error);
-    return res
-      .status(500)
-      .json({ message: 'Error al registrar el usuario.', error: error.message });
-  }
-});
+    try {
+        // Hashear la contraseña
+        const hashedPassword = await bcrypt.hash(password, 10);
         
         // Generar el código de verificación
         const newVerificationCode = crypto.randomBytes(3).toString('hex');
