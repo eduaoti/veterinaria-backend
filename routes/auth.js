@@ -59,55 +59,104 @@ router.post('/update-profile-photo', upload.single('fotoPerfil'), async (req, re
 
 // Ruta para registrar un nuevo usuario
 router.post('/register', upload.single('fotoPerfil'), async (req, res) => {
-    const { nombre, apellidoPaterno, apellidoMaterno, email, password, telefono, role } = req.body;
-
-    // Validación de campos requeridos
-    if (!nombre || !apellidoPaterno || !apellidoMaterno || !email || !telefono || !role || !password) {
-        return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
-    }
-
-    if (!validator.isEmail(email)) {
-        return res.status(400).json({ message: 'El correo electrónico no es válido.' });
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-        return res.status(409).json({ message: 'El correo electrónico ya está registrado.' });
-    }
-
     try {
-        // Hashear la contraseña
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        // Generar el código de verificación
-        const newVerificationCode = crypto.randomBytes(3).toString('hex');
-        
-        // Guardar el nuevo usuario
-        const newUser = new User({ 
-            nombre, 
-            apellidoPaterno, 
-            apellidoMaterno, 
-            email, 
-            password: hashedPassword,
-            telefono, 
-            role, 
-            verificationCode: newVerificationCode,
-            isVerified: false,
-            fotoPerfil: req.file ? req.file.path : null // Guardar la ruta de la foto de perfil
-        });
-        
-        await newUser.save();
-
-        // Enviar el correo de registro y el código de verificación
-        await sendVerificationCodeEmail(email, nombre, apellidoPaterno, apellidoMaterno, newVerificationCode);
-
-        res.status(201).json({ message: 'Usuario registrado exitosamente. Verifique su correo electrónico.', success: true });
+      // -------------------------------
+      // 1) Desestructurar y validar datos
+      // -------------------------------
+      const {
+        nombre,
+        apellidoPaterno,
+        apellidoMaterno,
+        email,
+        password,
+        telefono,
+        role
+      } = req.body;
+  
+      // Validación de campos obligatorios
+      if (
+        !nombre ||
+        !apellidoPaterno ||
+        !apellidoMaterno ||
+        !email ||
+        !telefono ||
+        !role ||
+        !password
+      ) {
+        // 400 Bad Request si falta algún campo
+        return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
+      }
+  
+      // Validación de formato de email
+      if (!validator.isEmail(email)) {
+        return res.status(400).json({ message: 'El correo electrónico no es válido.' });
+      }
+  
+      // -------------------------------
+      // 2) Comprobar si el usuario existe
+      // -------------------------------
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        // 409 Conflict si el email ya está registrado
+        return res.status(409).json({ message: 'El correo electrónico ya está registrado.' });
+      }
+  
+      // -------------------------------
+      // 3) Procesamiento principal
+      // -------------------------------
+      // Hashear contraseña
+      const hashedPassword = await bcrypt.hash(password, 10);
+      // Generar código de verificación
+      const newVerificationCode = crypto.randomBytes(3).toString('hex');
+  
+      // Crear documento Mongoose
+      const newUser = new User({
+        nombre,
+        apellidoPaterno,
+        apellidoMaterno,
+        email,
+        password: hashedPassword,
+        telefono,
+        role,
+        verificationCode: newVerificationCode,
+        isVerified: false,
+        fotoPerfil: req.file ? req.file.path : null
+      });
+  
+      // Guardar en MongoDB
+      await newUser.save();
+  
+      // Enviar correo de verificación
+      await sendVerificationCodeEmail(
+        email,
+        nombre,
+        apellidoPaterno,
+        apellidoMaterno,
+        newVerificationCode
+      );
+  
+      // -------------------------------
+      // 4) Respuesta de éxito
+      // -------------------------------
+      res.status(201).json({
+        message: 'Usuario registrado exitosamente. Verifique su correo electrónico.',
+        success: true
+      });
+  
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error al registrar el usuario.', error: error.message });
+      // -------------------------------
+      // MANEJO DE ERRORES (Tarjeta 3)
+      // -------------------------------
+      // Cualquier excepción en el bloque try (findOne, hash, save, envío de mail, etc.)
+      // es capturada aquí y se responde con 500 Internal Server Error.
+      console.error('Error en /register:', error);
+      res.status(500).json({
+        message: 'Error al registrar el usuario.',
+        error: error.message
+      });
     }
-});
-
+  });
+  
 // Ruta para verificar el código de verificación
 router.post('/verify', async (req, res) => {
     const { email, verificationCode } = req.body;
