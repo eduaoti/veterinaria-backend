@@ -1,7 +1,10 @@
 const express = require('express');
+// 🔐 A02: Cifrado en reposo – bcrypt para proteger contraseñas
 const bcrypt = require('bcryptjs');
+// 🔐 A02: Cifrado en tránsito – JWT usado correctamente (protegido por HTTPS en Railway)
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+// 🧪 A03: Validación de entradas con validator
 const validator = require('validator');
 const crypto = require('crypto');
 const multer = require('multer');
@@ -57,7 +60,9 @@ router.post('/update-profile-photo', upload.single('fotoPerfil'), async (req, re
     }
 });
 
-// Ruta para registrar un nuevo usuario
+// ------------------
+// RUTA: Registro
+// ------------------
 router.post('/register', upload.single('fotoPerfil'), async (req, res) => {
     try {
       // -------------------------------
