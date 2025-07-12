@@ -11,19 +11,12 @@ module.exports = createLogger({
         ? JSON.stringify(meta)
         : '';
 
-      // Nos aseguramos de que timestamp sea string
-      const safeTimestamp = typeof timestamp === 'object'
-        ? JSON.stringify(timestamp)
-        : timestamp;
+      // Aseguramos que timestamp y message sean strings:
+      const safeTimestamp = String(timestamp);
+      const safeMessage   = String(message);
 
-      // Y lo mismo para el mensaje
-      const safeMessage = typeof message === 'object'
-        ? JSON.stringify(message)
-        : message;
-
-      // Forzamos la llamada a toString() para que Sonar no lo trate como
-      // “stringificación implícita de objeto”
-      return `${safeTimestamp.toString()} [${level.toUpperCase()}] ${safeMessage.toString()} ${metaString}`;
+      // Y componemos la línea con un template literal:
+      return `${safeTimestamp} [${level.toUpperCase()}] ${safeMessage} ${metaString}`;
     })
   ),
   transports: [
