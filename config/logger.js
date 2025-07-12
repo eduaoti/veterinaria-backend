@@ -6,11 +6,14 @@ module.exports = createLogger({
   format: format.combine(
     format.timestamp(),
     format.printf(({ timestamp, level, message, ...meta }) => {
-      const metaString = Object.keys(meta).length ? JSON.stringify(meta) : '';
-      return ${timestamp} [${level.toUpperCase()}] ${message} ${metaString};
+      const metaString = Object.keys(meta).length
+        ? JSON.stringify(meta)
+        : '';
+      // ← Aquí usamos backticks para la template literal:
+      return `${timestamp} [${level.toUpperCase()}] ${message} ${metaString}`;
     })
   ),
   transports: [
     new transports.Console()
-],
+  ],
 });
