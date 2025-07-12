@@ -46,32 +46,52 @@ router.post(
     '/update-profile-photo',
     upload.single('fotoPerfil'),
     async (req, res) => {
-      const token = req.headers.authorization?.split(' ')[1];
-      if (!token) {
-        return res.status(401).json({ message: 'No se proporcionó un token.' });
+      // 1. Comprobar cabecera Authorization
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ message: 'No se proporcionó el token.' });
       }
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.userId);
-        if (!user) {
-          return res.status(404).json({ message: 'Usuario no encontrado.' });
-        }
-        if (!req.file) {
-          return res.status(400).json({ message: 'No se encontró el archivo.' });
-        }
+      const parts = authHeader.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        return res.status(401).json({ message: 'Formato de token inválido.' });
+      }
+      const token = parts[1];
   
-        // Aquí envolvemos la subida en una verdadera Promise
+      // 2. Verificar y decodificar JWT
+      let payload;
+      try {
+        payload = jwt.verify(token, process.env.JWT_SECRET);
+      } catch (err) {
+        return res.status(401).json({ message: 'Token inválido o expirado.' });
+      }
+  
+      // 3. Buscar usuario
+      const userId = payload.userId || payload.id;
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'Usuario no encontrado.' });
+      }
+  
+      // 4. Comprobar que venga archivo
+      if (!req.file) {
+        return res.status(400).json({ message: 'No se proporcionó ninguna imagen.' });
+      }
+  
+      // 5. Validar tipo de imagen
+      const allowedMime = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!allowedMime.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: 'Formato de imagen no permitido.' });
+      }
+  
+      // 6. Subir a Cloudinary envolviendo en Promise
+      try {
         const uploadResult = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             { folder: 'perfiles', public_id: `perfil_${user._id}` },
-            (err, result) => {
-              if (err) {
-                // Siempre rechazamos con un Error
-                return reject(
-                  err instanceof Error
-                    ? err
-                    : new Error(`Cloudinary upload failed: ${String(err)}`)
-                );
+            (error, result) => {
+              if (error) {
+                // **Siempre** rechazamos con un Error
+                return reject(new Error(`Cloudinary upload failed: ${error.message || error}`));
               }
               resolve(result);
             }
@@ -79,7 +99,7 @@ router.post(
           stream.end(req.file.buffer);
         });
   
-        // Si llegamos aquí, la subida fue exitosa
+        // 7. Guardar URL y responder
         user.fotoPerfil = uploadResult.secure_url;
         await user.save();
   
@@ -88,15 +108,12 @@ router.post(
           fotoPerfil: user.fotoPerfil,
         });
       } catch (error) {
-        console.error('Error al actualizar la foto de perfil:', error);
-        return res
-          .status(500)
-          .json({ message: 'Error interno. Intenta más tarde.' });
+        // 8. Loguear y responder error genérico
+        logger.error(`Error al subir foto de perfil: ${error}`);
+        return res.status(500).json({ message: 'Error interno. Intenta más tarde.' });
       }
     }
   );
-  
-  
 /*
  * A07:2021 - Identification and Authentication Failures
  * ------------------------------------------------------------
