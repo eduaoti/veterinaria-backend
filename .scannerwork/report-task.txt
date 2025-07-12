@@ -2,5 +2,5 @@ projectKey=VeterinariaBackend
 serverUrl=http://localhost:9000
 serverVersion=25.6.0.109173
 dashboardUrl=http://localhost:9000/dashboard?id=VeterinariaBackend
-ceTaskId=9f599ea9-73bb-49f3-b88b-4703093c8ab3
-ceTaskUrl=http://localhost:9000/api/ce/task?id=9f599ea9-73bb-49f3-b88b-4703093c8ab3
+ceTaskId=367702af-41d4-48f6-85ec-81198df1dfac
+ceTaskUrl=http://localhost:9000/api/ce/task?id=367702af-41d4-48f6-85ec-81198df1dfac
