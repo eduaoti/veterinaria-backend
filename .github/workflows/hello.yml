@@ -14,6 +14,10 @@ jobs:
       # 2) Instala dependencias de forma limpia
       - name: Instalar dependencias
         run: npm ci
+        # ------------------------------------------------
+# ✔ npm ci garantiza que sólo se instalan paquetes con hashes validados en package-lock.json.
+# ✔ No usamos scripts inseguros ni descargas remotas (evitamos curl | bash).
+# ✔ Todas las secrets (claves, tokens) se obtienen vía GitHub Secrets, nunca hard-coded.
 
       # 3) Escanea vulnerabilidades de alta severidad y falla si las hay
       - name: Escanear vulnerabilidades
