@@ -4,8 +4,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "outdated": "npm outdated",
+    "audit":    "npm audit --audit-level=high"
   },
+
   "keywords": [],
   "author": "",
   "license": "ISC",
