@@ -39,7 +39,7 @@ const { sendPasswordRecoveryEmail } = require('../services/passwordRecoveryMaile
 const { sendPasswordUpdatedEmail } = require('../services/passwordUpdateMailer');
 const cloudinary = require('../services/cloudinaryConfig');
 
-const multer  = require('multer');
+
 const storage = multer.memoryStorage();
 
 const upload = multer({
