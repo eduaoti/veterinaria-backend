@@ -87,6 +87,20 @@ router.post(
     }
   }
 );
+/*
+ * A07:2021 - Identification and Authentication Failures
+ * ------------------------------------------------------------
+ * ✔️ Prácticas de autenticación:
+ *    • Validación de fuerza de contraseña en /register (min 10 caracteres, mayúsculas, números, símbolos).
+ *    • Conteo y bloqueo de intentos fallidos en /login (p.ej. bloquea 1 hora tras 5 intentos).
+ *    • MFA opcional tras validar contraseña: generación/envío de código TOTP y verificación antes de emitir JWT.
+ *
+ * ✔️ Gestión segura de sesiones:
+ *    • JWT con expiración corta (expiresIn: '2m') para limitar ventana de ataque.
+ *    • Refresh tokens con rotación en /renew-token y revocación del anterior.
+ *    • (Si usas cookies de sesión) timeout en cookie (maxAge) y regeneración de sesión tras login.
+ */
+
 
 // ------------------
 // RUTA: Registro
