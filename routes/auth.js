@@ -42,11 +42,15 @@ const cloudinary = require('../services/cloudinaryConfig');
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 // Ruta para actualizar la foto de perfil
+
+/**
+ * 📌 Actualizar foto de perfil
+ */
 router.post(
     '/update-profile-photo',
     upload.single('fotoPerfil'),
     async (req, res) => {
-      // 1. Comprobar cabecera Authorization
+      // 1️⃣ Comprobar cabecera Authorization
       const authHeader = req.headers.authorization;
       if (!authHeader) {
         return res.status(401).json({ message: 'No se proporcionó el token.' });
@@ -57,41 +61,45 @@ router.post(
       }
       const token = parts[1];
   
-      // 2. Verificar y decodificar JWT
+      // 2️⃣ Verificar y decodificar JWT
       let payload;
       try {
         payload = jwt.verify(token, process.env.JWT_SECRET);
-      } catch (err) {
+      } catch (verifyError) {
+        // Usamos la excepción para no ignorarla
+        logger.warn('Error al verificar JWT', { error: verifyError });
         return res.status(401).json({ message: 'Token inválido o expirado.' });
       }
   
-      // 3. Buscar usuario
+      // 3️⃣ Buscar usuario en BD
       const userId = payload.userId || payload.id;
       const user = await User.findById(userId);
       if (!user) {
         return res.status(404).json({ message: 'Usuario no encontrado.' });
       }
   
-      // 4. Comprobar que venga archivo
+      // 4️⃣ Comprobar que venga archivo
       if (!req.file) {
         return res.status(400).json({ message: 'No se proporcionó ninguna imagen.' });
       }
   
-      // 5. Validar tipo de imagen
+      // 5️⃣ Validar tipo de imagen
       const allowedMime = ['image/jpeg', 'image/png', 'image/gif'];
       if (!allowedMime.includes(req.file.mimetype)) {
         return res.status(400).json({ message: 'Formato de imagen no permitido.' });
       }
   
-      // 6. Subir a Cloudinary envolviendo en Promise
+      // 6️⃣ Subir a Cloudinary
       try {
         const uploadResult = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             { folder: 'perfiles', public_id: `perfil_${user._id}` },
             (error, result) => {
               if (error) {
-                // **Siempre** rechazamos con un Error
-                return reject(new Error(`Cloudinary upload failed: ${error.message || error}`));
+                // Siempre rechazamos con un Error
+                return reject(
+                  new Error(`Cloudinary upload failed: ${error.message || error}`)
+                );
               }
               resolve(result);
             }
@@ -99,17 +107,18 @@ router.post(
           stream.end(req.file.buffer);
         });
   
-        // 7. Guardar URL y responder
+        // 7️⃣ Guardar URL en el usuario y responder
         user.fotoPerfil = uploadResult.secure_url;
         await user.save();
   
         return res.status(200).json({
-          message: 'Foto de perfil actualizada exitosamente.',
+          message:    'Foto de perfil actualizada exitosamente.',
           fotoPerfil: user.fotoPerfil,
         });
-      } catch (error) {
-        // 8. Loguear y responder error genérico
-        logger.error(`Error al subir foto de perfil: ${error}`);
+  
+      } catch (uploadError) {
+        // Logueamos el error subido y devolvemos 500
+        logger.error('Error al subir foto de perfil', { error: uploadError });
         return res.status(500).json({ message: 'Error interno. Intenta más tarde.' });
       }
     }
