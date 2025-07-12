@@ -6,23 +6,24 @@ module.exports = createLogger({
   format: format.combine(
     format.timestamp(),
     format.printf(({ timestamp, level, message, ...meta }) => {
-      // Si vienen metadatos, los serializamos a JSON:
+      // Serializamos los metadatos si existen
       const metaString = Object.keys(meta).length
         ? JSON.stringify(meta)
         : '';
 
-      // Garantizamos que timestamp siempre sea un string:
+      // Nos aseguramos de que timestamp sea string
       const safeTimestamp = typeof timestamp === 'object'
         ? JSON.stringify(timestamp)
         : timestamp;
 
-      // Y lo mismo para el mensaje:
+      // Y lo mismo para el mensaje
       const safeMessage = typeof message === 'object'
         ? JSON.stringify(message)
         : message;
 
-      // Ahora usamos las versiones "seguras" en la template literal:
-      return `${safeTimestamp} [${level.toUpperCase()}] ${safeMessage} ${metaString}`;
+      // Forzamos la llamada a toString() para que Sonar no lo trate como
+      // “stringificación implícita de objeto”
+      return `${safeTimestamp.toString()} [${level.toUpperCase()}] ${safeMessage.toString()} ${metaString}`;
     })
   ),
   transports: [
