@@ -10,7 +10,7 @@ module.exports = createLogger({
         ? JSON.stringify(meta)
         : '';
       // ← Aquí usamos backticks para la template literal:
-      return `${timestamp} [${level.toUpperCase()}] ${message} ${metaString}`;
+      return `${timestamp} [${level.toUpperCase()}] ${message.toString()} ${metaString}`;
     })
   ),
   transports: [
