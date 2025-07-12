@@ -44,49 +44,52 @@ const upload = multer({ storage: storage });
 
 // Ruta para actualizar la foto de perfil
 router.post(
-  '/update-profile-photo',
-  upload.single('fotoPerfil'),
-  async (req, res) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ message: 'No se proporcionó un token.' });
-    }
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const userId = decoded.userId;
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ message: 'Usuario no encontrado.' });
+    '/update-profile-photo',
+    upload.single('fotoPerfil'),
+    async (req, res) => {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ message: 'No se proporcionó un token.' });
       }
-      if (req.file) {
-        const result = await cloudinary.uploader.upload_stream(
-          { folder: 'perfiles', public_id: `perfil_${userId}` },
-          (error, result) => {
-            if (error) {
-              console.error('Error al subir a Cloudinary:', error);
-              return res
-                .status(500)
-                .json({ message: 'Error al subir a Cloudinary.' });
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+        if (!user) {
+          return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+        if (!req.file) {
+          return res.status(400).json({ message: 'No se encontró el archivo.' });
+        }
+  
+        // Aquí envolvemos la subida en una verdadera Promise
+        const result = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: 'perfiles', public_id: `perfil_${user._id}` },
+            (error, uploadResult) => {
+              if (error) return reject(error);
+              resolve(uploadResult);
             }
-            user.fotoPerfil = result.secure_url;
-            user.save();
-            res.status(200).json({
-              message: 'Foto de perfil actualizada exitosamente.',
-              fotoPerfil: user.fotoPerfil,
-            });
-          }
-        ).end(req.file.buffer);
-      } else {
-        res.status(400).json({ message: 'No se encontró el archivo.' });
+          );
+          stream.end(req.file.buffer);
+        });
+  
+        // Si llegamos aquí, la subida fue exitosa
+        user.fotoPerfil = result.secure_url;
+        await user.save();
+  
+        return res.status(200).json({
+          message: 'Foto de perfil actualizada exitosamente.',
+          fotoPerfil: user.fotoPerfil,
+        });
+      } catch (error) {
+        console.error('Error al actualizar la foto de perfil:', error);
+        return res
+          .status(500)
+          .json({ message: 'Error interno. Intenta más tarde.' });
       }
-    } catch (error) {
-      console.error('Error al actualizar la foto de perfil:', error);
-      res
-        .status(500)
-        .json({ message: 'Error interno. Intenta más tarde.' });
     }
-  }
-);
+  );
+  
 /*
  * A07:2021 - Identification and Authentication Failures
  * ------------------------------------------------------------

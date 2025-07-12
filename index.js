@@ -34,7 +34,7 @@ app.use(helmet());
 
 // ───── Sentry Init ─────
 // Sentry.init({ dsn: process.env.SENTRY_DSN });
-// app.use(Sentry.Handlers.requestHandler());
+
 
 // ───── Logging Middleware ─────
 app.use((req, res, next) => {
@@ -62,7 +62,7 @@ app.use('/', welcomeRoutes);
 // ───── Error Handling ─────
 app.use((err, req, res, next) => {
   logger.error('Unhandled error', { message: err.message, stack: err.stack });
-  // Sentry.captureException(err);
+  
   res.status(500).json({ message: 'Error interno. Intenta más tarde.' });
 });
 // app.use(Sentry.Handlers.errorHandler());
