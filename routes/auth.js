@@ -89,16 +89,18 @@ router.post(
         return res.status(400).json({ message: 'Formato de imagen no permitido.' });
       }
   
-      // 6️⃣ Subir a Cloudinary
       try {
         const uploadResult = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             { folder: 'perfiles', public_id: `perfil_${user._id}` },
             (error, result) => {
               if (error) {
-                // Siempre rechazamos con un Error
+                // Serializamos explícitamente el error:
+                const errMsg = error instanceof Error
+                  ? error.message
+                  : JSON.stringify(error);
                 return reject(
-                  new Error(`Cloudinary upload failed: ${error.message || error}`)
+                  new Error('Cloudinary upload failed: ' + errMsg)
                 );
               }
               resolve(result);
@@ -106,6 +108,7 @@ router.post(
           );
           stream.end(req.file.buffer);
         });
+      
   
         // 7️⃣ Guardar URL en el usuario y responder
         user.fotoPerfil = uploadResult.secure_url;
@@ -116,9 +119,11 @@ router.post(
           fotoPerfil: user.fotoPerfil,
         });
   
-      } catch (uploadError) {
-        // Logueamos el error subido y devolvemos 500
-        logger.error('Error al subir foto de perfil', { error: uploadError });
+    } catch (uploadError) {
+        const errMsg = uploadError instanceof Error
+          ? uploadError.message
+          : JSON.stringify(uploadError);
+        logger.error('Error al subir foto de perfil', { error: errMsg });
         return res.status(500).json({ message: 'Error interno. Intenta más tarde.' });
       }
     }
