@@ -101,7 +101,6 @@ router.post(
  *    • (Si usas cookies de sesión) timeout en cookie (maxAge) y regeneración de sesión tras login.
  */
 
-
 // ------------------
 // RUTA: Registro
 // ------------------
