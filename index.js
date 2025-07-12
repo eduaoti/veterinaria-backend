@@ -1,88 +1,107 @@
+// server.js
+
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const cors = require('cors'); // Importa CORS
-const path = require('path'); // Importa path
+const cors = require('cors');
+const path = require('path');
 const cron = require('node-cron');
-const User = require('./models/User'); // Ajusta la ruta si tu modelo está en otra carpeta
-
+const helmet = require('helmet');            // ← Helmet para cabeceras seguras
+const Sentry = require('@sentry/node');      // ← (Opcional) Sentry para monitoreo de errores
+const logger = require('./config/logger');   // ← Tu instancia de Winston/Pino
+const User = require('./models/User');
 
 // Importa las rutas
-const authRoutes = require('./routes/auth'); // Rutas de autenticación
-const mascotasRoutes = require('./routes/mascotas'); // Rutas de mascotas
-const citasRoutes = require('./routes/citas'); // Importa las rutas de citas
-const planesRoutes = require('./routes/planes'); // Rutas de planes de cuidado
+const authRoutes = require('./routes/auth');
+const mascotasRoutes = require('./routes/mascotas');
+const citasRoutes = require('./routes/citas');
+const planesRoutes = require('./routes/planes');
 const welcomeRoutes = require('./routes/welcome');
 
-// Cargar variables de entorno desde el archivo .env
-dotenv.config(); 
+dotenv.config();
+const app = express();
 
-// Inicializa la aplicación de Express
-const app = express(); 
+// ───── Security Headers ─────
+app.use(helmet());
+/*
+ * A09:2021 - Security Logging and Monitoring Failures
+ * ---------------------------------------------------
+ * ✔️ Monitoreo activo de cada request con middleware de logging (Winston/Pino).
+ * ✔️ Captura centralizada de errores no manejados y envío a Sentry.
+ * ✔️ Logs estructurados de eventos críticos (login, registro, cronjobs).
+ */
 
-// Middleware
-app.use(cors()); // Habilita CORS para permitir solicitudes desde el frontend
-app.use(express.json()); // Middleware para parsear JSON
+// ───── Sentry Init ─────
+Sentry.init({ dsn: process.env.SENTRY_DSN });
+app.use(Sentry.Handlers.requestHandler());
 
-// Servir archivos estáticos desde la carpeta 'uploads'
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Usar rutas
-app.use('/auth', authRoutes); // Rutas de autenticación
-app.use('/api/mascotas', mascotasRoutes); // Rutas de mascotas
-app.use('/api/citas', citasRoutes); // Ruta para las citas
-app.use('/api/planes', planesRoutes); // Ruta para planes de cuidado
-app.use('/', welcomeRoutes);
-
-
-// Conexión a la base de datos MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-.then(() => console.log('Conectado a MongoDB'))
-.catch(error => console.error('Error al conectar a MongoDB:', error));
-
-// Configuración del puerto
-const PORT = process.env.PORT || 3000;
-
-// Iniciar el servidor
-app.listen(PORT, () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
+// ───── Logging Middleware ─────
+app.use((req, res, next) => {
+  logger.info('Incoming request', {
+    method: req.method,
+    url: req.url,
+    user: req.user?.id || 'anonymous',
+    ip: req.ip
+  });
+  next();
 });
 
-// Cronjob: borra usuarios que no han iniciado sesión en 30 días
+// ───── Core Middleware ─────
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ───── Routes ─────
+app.use('/auth', authRoutes);
+app.use('/api/mascotas', mascotasRoutes);
+app.use('/api/citas', citasRoutes);
+app.use('/api/planes', planesRoutes);
+app.use('/', welcomeRoutes);
+
+// ───── Error Handling ─────
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error', { message: err.message, stack: err.stack });
+  Sentry.captureException(err);
+  res.status(500).json({ message: 'Error interno. Intenta más tarde.' });
+});
+app.use(Sentry.Handlers.errorHandler());
+
+// ───── MongoDB Connection ─────
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => logger.info('Conectado a MongoDB'))
+.catch(error => logger.error('Error al conectar a MongoDB', { error }));
+
+// ───── Cronjob: limpieza usuarios inactivos ─────
 cron.schedule('0 2 * * *', async () => {
-    // 30 días en milisegundos
-    const haceUnMes = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  
-    try {
-      // 1) Busca usuarios inactivos (>30 días sin login)
-      const usuariosInactivos = await User.find({
-        $or: [
-          { lastLogin: { $lt: haceUnMes } },
-          { lastLogin: { $exists: false }, createdAt: { $lt: haceUnMes } }
-        ]
-      }).select('email');
-  
-      if (usuariosInactivos.length === 0) {
-        console.log('🔍 No hay usuarios inactivos (>30 días) para eliminar.');
-        return;
-      }
-  
-      // 2) Extrae y muestra los correos
-      const emails = usuariosInactivos.map(u => u.email);
-      console.log('📧 Correos a eliminar por inactividad (>30 días):', emails);
-  
-      // 3) Elimina esos usuarios
-      const resultado = await User.deleteMany({
-        _id: { $in: usuariosInactivos.map(u => u._id) }
-      });
-  
-      console.log(`🗑️ Eliminados ${resultado.deletedCount} usuarios inactivos.`);
-    } catch (err) {
-      console.error('Error al eliminar usuarios inactivos:', err);
+  logger.info('Iniciando limpieza de usuarios inactivos');
+  const haceUnMes = new Date(Date.now() - 30*24*60*60*1000);
+  try {
+    const usuariosInactivos = await User.find({
+      $or: [
+        { lastLogin: { $lt: haceUnMes } },
+        { lastLogin: { $exists: false, createdAt: { $lt: haceUnMes } } }
+      ]
+    }).select('email');
+    if (usuariosInactivos.length === 0) {
+      logger.info('No hay usuarios inactivos para eliminar');
+      return;
     }
-  });
-  
-  
+    const emails = usuariosInactivos.map(u => u.email);
+    logger.info('Usuarios a eliminar', { emails });
+    const resultado = await User.deleteMany({
+      _id: { $in: usuariosInactivos.map(u => u._id) }
+    });
+    logger.info('Usuarios eliminados', { count: resultado.deletedCount });
+  } catch (err) {
+    logger.error('Error en limpieza de usuarios', { error: err });
+  }
+});
+
+// ───── Start Server ─────
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  logger.info(`Servidor corriendo en el puerto ${PORT}`);
+});
