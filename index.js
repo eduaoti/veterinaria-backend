@@ -7,7 +7,7 @@ const cors = require('cors');
 const path = require('path');
 const cron = require('node-cron');
 const helmet = require('helmet');            // ← Helmet para cabeceras seguras
-const Sentry = require('@sentry/node');      // ← (Opcional) Sentry para monitoreo de errores
+// const Sentry = require('@sentry/node');   // ← (Opcional) Sentry para monitoreo de errores
 const logger = require('./config/logger');   // ← Tu instancia de Winston/Pino
 const User = require('./models/User');
 
@@ -23,17 +23,18 @@ const app = express();
 
 // ───── Security Headers ─────
 app.use(helmet());
+
 /*
  * A09:2021 - Security Logging and Monitoring Failures
  * ---------------------------------------------------
  * ✔️ Monitoreo activo de cada request con middleware de logging (Winston/Pino).
- * ✔️ Captura centralizada de errores no manejados y envío a Sentry.
+ * ✔️ Captura centralizada de errores no manejados (Sentry desactivado).
  * ✔️ Logs estructurados de eventos críticos (login, registro, cronjobs).
  */
 
 // ───── Sentry Init ─────
-Sentry.init({ dsn: process.env.SENTRY_DSN });
-app.use(Sentry.Handlers.requestHandler());
+// Sentry.init({ dsn: process.env.SENTRY_DSN });
+// app.use(Sentry.Handlers.requestHandler());
 
 // ───── Logging Middleware ─────
 app.use((req, res, next) => {
@@ -61,10 +62,10 @@ app.use('/', welcomeRoutes);
 // ───── Error Handling ─────
 app.use((err, req, res, next) => {
   logger.error('Unhandled error', { message: err.message, stack: err.stack });
-  Sentry.captureException(err);
+  // Sentry.captureException(err);
   res.status(500).json({ message: 'Error interno. Intenta más tarde.' });
 });
-app.use(Sentry.Handlers.errorHandler());
+// app.use(Sentry.Handlers.errorHandler());
 
 // ───── MongoDB Connection ─────
 mongoose.connect(process.env.MONGO_URI, {
