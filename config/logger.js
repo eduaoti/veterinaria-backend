@@ -6,14 +6,23 @@ module.exports = createLogger({
   format: format.combine(
     format.timestamp(),
     format.printf(({ timestamp, level, message, ...meta }) => {
+      // Si vienen metadatos, los serializamos a JSON:
       const metaString = Object.keys(meta).length
         ? JSON.stringify(meta)
         : '';
-        const safeMessage = typeof message === 'object'
-    ? JSON.stringify(message)
-    : message;
-      // ← Aquí usamos backticks para la template literal:
-      return `${timestamp} [${level.toUpperCase()}] ${safeMessage} ${metaString}`;
+
+      // Garantizamos que timestamp siempre sea un string:
+      const safeTimestamp = typeof timestamp === 'object'
+        ? JSON.stringify(timestamp)
+        : timestamp;
+
+      // Y lo mismo para el mensaje:
+      const safeMessage = typeof message === 'object'
+        ? JSON.stringify(message)
+        : message;
+
+      // Ahora usamos las versiones "seguras" en la template literal:
+      return `${safeTimestamp} [${level.toUpperCase()}] ${safeMessage} ${metaString}`;
     })
   ),
   transports: [
