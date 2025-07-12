@@ -39,8 +39,19 @@ const { sendPasswordRecoveryEmail } = require('../services/passwordRecoveryMaile
 const { sendPasswordUpdatedEmail } = require('../services/passwordUpdateMailer');
 const cloudinary = require('../services/cloudinaryConfig');
 
+const multer  = require('multer');
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 2 * 1024 * 1024,  // 2 MB máximo
+    files:    1,                // sólo 1 archivo
+    fields:   10,               // hasta 10 campos no-file
+    parts:    11                // total de piezas (1 archivo + 10 campos)
+  }
+});
+
 // Ruta para actualizar la foto de perfil
 
 /**

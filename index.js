@@ -1,29 +1,27 @@
 // server.js
 
-const express = require('express');
+const express  = require('express');
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const path = require('path');
-const cron = require('node-cron');
-const helmet = require('helmet');            // ← Helmet para cabeceras seguras
-// const Sentry = require('@sentry/node');   // ← (Opcional) Sentry para monitoreo de errores
-const logger = require('./config/logger');   // ← Tu instancia de Winston/Pino
-const User = require('./models/User');
+const dotenv   = require('dotenv');
+const cors     = require('cors');
+const path     = require('path');
+const cron     = require('node-cron');
+const helmet   = require('helmet');
+const logger   = require('./config/logger');
+const User     = require('./models/User');
 
 // Importa las rutas
-const authRoutes = require('./routes/auth');
+const authRoutes     = require('./routes/auth');
 const mascotasRoutes = require('./routes/mascotas');
-const citasRoutes = require('./routes/citas');
-const planesRoutes = require('./routes/planes');
-const welcomeRoutes = require('./routes/welcome');
+const citasRoutes    = require('./routes/citas');
+const planesRoutes   = require('./routes/planes');
+const welcomeRoutes  = require('./routes/welcome');
 
 dotenv.config();
 const app = express();
 
-// ───── Security Headers ─────
+// ─── Security Headers ───
 app.use(helmet());
-
 /*
  * A09:2021 - Security Logging and Monitoring Failures
  * ---------------------------------------------------
@@ -35,8 +33,7 @@ app.use(helmet());
 // ───── Sentry Init ─────
 // Sentry.init({ dsn: process.env.SENTRY_DSN });
 
-
-// ───── Logging Middleware ─────
+// ─── Logging Middleware ───
 app.use((req, res, next) => {
   logger.info('Incoming request', {
     method: req.method,
@@ -47,38 +44,40 @@ app.use((req, res, next) => {
   next();
 });
 
-// ───── Core Middleware ─────
+// ─── Core Middleware con límites ───
 app.use(cors());
-app.use(express.json());
+// Limita bodies JSON a 100 KB
+app.use(express.json({ limit: '100kb' }));
+// Limita bodies urlencoded a 100 KB
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+// Sirve estáticos de /uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ───── Routes ─────
+// ─── Monta las rutas ───
 app.use('/auth', authRoutes);
 app.use('/api/mascotas', mascotasRoutes);
 app.use('/api/citas', citasRoutes);
 app.use('/api/planes', planesRoutes);
 app.use('/', welcomeRoutes);
 
-// ───── Error Handling ─────
+// ─── Manejador global de errores ───
 app.use((err, req, res, next) => {
   logger.error('Unhandled error', { message: err.message, stack: err.stack });
-  
   res.status(500).json({ message: 'Error interno. Intenta más tarde.' });
 });
 
-
-// ───── MongoDB Connection ─────
+// ─── Conexión a MongoDB ───
 mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
+  useNewUrlParser:    true,
   useUnifiedTopology: true
 })
 .then(() => logger.info('Conectado a MongoDB'))
 .catch(error => logger.error('Error al conectar a MongoDB', { error }));
 
-// ───── Cronjob: limpieza usuarios inactivos ─────
+// ─── Cronjob: limpieza de usuarios inactivos ───
 cron.schedule('0 2 * * *', async () => {
   logger.info('Iniciando limpieza de usuarios inactivos');
-  const haceUnMes = new Date(Date.now() - 30*24*60*60*1000);
+  const haceUnMes = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   try {
     const usuariosInactivos = await User.find({
       $or: [
@@ -101,7 +100,7 @@ cron.schedule('0 2 * * *', async () => {
   }
 });
 
-// ───── Start Server ─────
+// ─── Arranca el servidor ───
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   logger.info(`Servidor corriendo en el puerto ${PORT}`);
