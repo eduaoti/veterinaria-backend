@@ -61,36 +61,35 @@ async function getNextFolio() {
   const counter = await Mascota.countDocuments();
   return counter + 1;
 }
-// 📌 Crear nueva mascota
 router.post('/', upload.single('foto'), async (req, res) => {
   try {
-    // 🔍 Mostrar body crudo recibido
+    // 🔍 1) Mostrar body crudo recibido
     console.log('📦 Body recibido (crudo):', req.body);
 
-    // Parsear los campos JSON si vienen como string
-    req.body.dueno         = parseIfJson(req.body.dueno);
-    req.body.alergias      = parseIfJson(req.body.alergias);
-    req.body.alimentacion  = parseIfJson(req.body.alimentacion);
-    req.body.veterinario   = parseIfJson(req.body.veterinario);
-    req.body.servicios     = parseIfJson(req.body.servicios);
+    // 🔄 2) Parsear campos JSON que vengan como string
+    req.body.dueno        = parseIfJson(req.body.dueno);
+    req.body.alergias     = parseIfJson(req.body.alergias);
+    req.body.alimentacion = parseIfJson(req.body.alimentacion);
+    req.body.veterinario  = parseIfJson(req.body.veterinario);
+    req.body.servicios    = parseIfJson(req.body.servicios);
 
-    // 🔍 Mostrar body ya parseado
     console.log('✅ Body parseado:', req.body);
-    console.log('🛠 Servicios:', req.body.servicios);
 
-    // Validación
+    // 🔧 3) Validación con Joi
     const { error } = mascotaSchema.validate(req.body);
     if (error) {
       console.error('❌ Error de validación:', error.details);
       return res.status(400).json({
         message: 'Error de validación',
-        error: error.details
+        error:   error.details
       });
     }
 
+    // 🔢 4) Obtener siguiente folio
     const numeroFolio = await getNextFolio();
-    let imageUrl = null;
 
+    // 📷 5) Si hay archivo, subirlo a Cloudinary
+    let imageUrl = null;
     if (req.file) {
       imageUrl = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -99,9 +98,7 @@ router.post('/', upload.single('foto'), async (req, res) => {
             if (err) {
               // rechazamos siempre con instancia de Error
               return reject(
-                err instanceof Error
-                  ? err
-                  : new Error(`Cloudinary upload error: ${String(err)}`)
+                new Error('Cloudinary upload error: ' + (err.message || String(err)))
               );
             }
             resolve(result.secure_url);
@@ -111,26 +108,27 @@ router.post('/', upload.single('foto'), async (req, res) => {
       });
     }
 
+    // 🐾 6) Crear y guardar la nueva mascota
     const nuevaMascota = new Mascota({
       ...req.body,
-      fotoUrl:    imageUrl,
+      fotoUrl:      imageUrl,
       numeroFolio,
-      fechaIngreso: new Date(),
+      fechaIngreso: new Date()
     });
-
     await nuevaMascota.save();
-    console.log('🎉 Mascota guardada exitosamente:', nuevaMascota);
-    res.status(201).json(nuevaMascota);
 
-  } catch (error) {
-    console.error('🔥 Error en el servidor al crear la mascota:', error);
-    res.status(500).json({
+    console.log('🎉 Mascota guardada exitosamente:', nuevaMascota);
+    return res.status(201).json(nuevaMascota);
+
+  } catch (err) {
+    // 🔥 7) Capturar y reportar errores internos
+    console.error('🔥 Error en el servidor al crear la mascota:', err);
+    return res.status(500).json({
       message: 'Error al crear la mascota',
-      error:   error.message
+      error:   err.message || String(err)
     });
   }
 });
-
 
 // 📌 Obtener todas las mascotas
 router.get('/', async (req, res) => {
