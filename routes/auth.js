@@ -41,7 +41,6 @@ const cloudinary = require('../services/cloudinaryConfig');
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-
 // Ruta para actualizar la foto de perfil
 router.post(
     '/update-profile-photo',
@@ -62,19 +61,26 @@ router.post(
         }
   
         // Aquí envolvemos la subida en una verdadera Promise
-        const result = await new Promise((resolve, reject) => {
+        const uploadResult = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             { folder: 'perfiles', public_id: `perfil_${user._id}` },
-            (error, uploadResult) => {
-              if (error) return reject(error);
-              resolve(uploadResult);
+            (err, result) => {
+              if (err) {
+                // Siempre rechazamos con un Error
+                return reject(
+                  err instanceof Error
+                    ? err
+                    : new Error(`Cloudinary upload failed: ${String(err)}`)
+                );
+              }
+              resolve(result);
             }
           );
           stream.end(req.file.buffer);
         });
   
         // Si llegamos aquí, la subida fue exitosa
-        user.fotoPerfil = result.secure_url;
+        user.fotoPerfil = uploadResult.secure_url;
         await user.save();
   
         return res.status(200).json({
@@ -89,6 +95,7 @@ router.post(
       }
     }
   );
+  
   
 /*
  * A07:2021 - Identification and Authentication Failures
