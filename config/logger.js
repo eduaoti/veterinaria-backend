@@ -9,8 +9,11 @@ module.exports = createLogger({
       const metaString = Object.keys(meta).length
         ? JSON.stringify(meta)
         : '';
+        const safeMessage = typeof message === 'object'
+    ? JSON.stringify(message)
+    : message;
       // ← Aquí usamos backticks para la template literal:
-      return `${timestamp} [${level.toUpperCase()}] ${message.toString()} ${metaString}`;
+      return `${timestamp} [${level.toUpperCase()}] ${safeMessage} ${metaString}`;
     })
   ),
   transports: [
