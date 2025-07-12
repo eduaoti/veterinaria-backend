@@ -1,51 +1,50 @@
 // config/logger.js
-
 const { createLogger, format, transports } = require('winston');
 
 /**
- * Custom printf formatter que:
- * 1) Llama siempre a toString() en timestamp y message.
- * 2) Si message es un objeto que no tiene toString específico, lo JSON.stringify.
- * 3) Serializa meta con JSON.stringify.
+ * Custom printf formatter que evita la stringificación por defecto:
+ *  - timestamp: si es string lo dejamos, si es Date usamos toISOString(), si no JSON.stringify.
+ *  - message: si es string/number/boolean lo dejamos o convertimos con toString(),
+ *             si es Error usamos error.message,
+ *             en cualquier otro caso JSON.stringify.
+ *  - meta: siempre JSON.stringify(meta).
  */
 const customFormat = format.printf(({ timestamp, level, message, ...meta }) => {
   // 1) Meta como JSON si existe
-  const metaString = Object.keys(meta).length > 0
+  const metaString = Object.keys(meta).length
     ? ' ' + JSON.stringify(meta)
     : '';
 
-  // 2) Timestamp seguro: llamamos a toString(), asumiendo que es Date o string
-  const safeTimestamp = timestamp != null && typeof timestamp.toString === 'function'
-    ? timestamp.toString()
-    : '';
-
-  // 3) Message seguro:
-  let safeMessage;
-  if (message instanceof Error) {
-    // Para errores aprovechamos message.message
-    safeMessage = message.message;
-  } else if (message != null && typeof message.toString === 'function' && message.toString !== Object.prototype.toString) {
-    // Si tiene toString “propio”, lo usamos
-    safeMessage = message.toString();
-  } else if (typeof message === 'object') {
-    // Objeto plano sin toString custom → JSON
-    safeMessage = JSON.stringify(message);
+  // 2) Timestamp seguro
+  let safeTimestamp;
+  if (typeof timestamp === 'string') {
+    safeTimestamp = timestamp;
+  } else if (timestamp instanceof Date) {
+    safeTimestamp = timestamp.toISOString();
   } else {
-    // Primitivo (string, number, etc.)
-    safeMessage = message != null
-      ? message.toString()
-      : '';
+    safeTimestamp = JSON.stringify(timestamp);
   }
 
-  // 4) Componer salida
+  // 3) Message seguro
+  let safeMessage;
+  if (message instanceof Error) {
+    safeMessage = message.message;
+  } else if (typeof message === 'string') {
+    safeMessage = message;
+  } else if (typeof message === 'number' || typeof message === 'boolean') {
+    safeMessage = message.toString();
+  } else {
+    safeMessage = JSON.stringify(message);
+  }
+
+  // 4) Componer línea de log
   return `${safeTimestamp} [${level.toUpperCase()}] ${safeMessage}${metaString}`;
 });
 
 module.exports = createLogger({
   level: 'info',
   format: format.combine(
-    // Winston por defecto crea timestamp como ISO string, o bien un Date si personalizas
-    format.timestamp(),
+    format.timestamp(),  // Por defecto produce un ISO string
     customFormat
   ),
   transports: [
