@@ -65,7 +65,7 @@ app.use((err, req, res, next) => {
   
   res.status(500).json({ message: 'Error interno. Intenta más tarde.' });
 });
-// app.use(Sentry.Handlers.errorHandler());
+
 
 // ───── MongoDB Connection ─────
 mongoose.connect(process.env.MONGO_URI, {
