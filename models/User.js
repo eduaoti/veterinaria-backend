@@ -8,7 +8,16 @@ const UserSchema = new mongoose.Schema({
     apellidoMaterno: { type: String, required: true },
     email: { type: String, required: true, unique: true, validate: { validator: (v) => validator.isEmail(v), message: props => `${props.value} no es un correo electrónico válido!` }},
     password: { type: String, required: true },
-    telefono: { type: String, required: true, validate: { validator: (v) => /^[0-9]{10}$/.test(v), message: props => `${props.value} no es un número de teléfono válido!` }},
+    telefono: {
+        type: String,
+        required: true,
+        validate: {
+          // \d equivale a [0-9], así que usamos /^\d{10}$/ en lugar de /^[0-9]{10}$/:
+          validator: (v) => /^\d{10}$/.test(v),
+          message: props => `${props.value} no es un número de teléfono válido!`
+        }
+      },
+      
     role: { type: String, enum: ['cliente', 'veterinario'], default: 'cliente' },
     verificationCode: { type: String },
     isVerified: { type: Boolean, default: false },
