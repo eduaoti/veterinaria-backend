@@ -9,6 +9,7 @@ const CitaSchema = new mongoose.Schema({
   cliente: {
     type: String,
     required: true,
+    
   },
   correo: {
     type: String,
