@@ -11,17 +11,35 @@ jobs:
       # 1) Clona tu repo
       - uses: actions/checkout@v3
 
-      # 2) Instala dependencias de forma limpia
+      # 2) Instala dependencias
       - name: Instalar dependencias
         run: npm ci
-        # ------------------------------------------------
-# ✔ npm ci garantiza que sólo se instalan paquetes con hashes validados en package-lock.json.
-# ✔ No usamos scripts inseguros ni descargas remotas (evitamos curl | bash).
-# ✔ Todas las secrets (claves, tokens) se obtienen vía GitHub Secrets, nunca hard-coded.
 
       # 3) Escanea vulnerabilidades de alta severidad y falla si las hay
       - name: Escanear vulnerabilidades
         run: npm audit --audit-level=high
+
+      # 4) Instala Node.js (para tu backend)
+      - name: Usar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # 5) Instala sonar-scanner
+      - name: Instalar sonar-scanner
+        run: npm install -g sonar-scanner
+
+      # 6) Ejecuta análisis en SonarCloud
+      - name: Ejecutar análisis SonarCloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          npx sonar-scanner \
+            -Dsonar.organization=eduauti \
+            -Dsonar.projectKey=eduauti_veterinaria-backend \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.token=$SONAR_TOKEN
 
       # Tus pasos originales
       - name: Echo terminal
